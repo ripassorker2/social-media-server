@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
 const app = express();
@@ -24,8 +24,115 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const usersCollection = client.db("social-media").collection("users");
+    const postsCollection = client.db("social-media").collection("posts");
+
+    // <<.......... post post.............>>
+    app.post("/post", async (req, res) => {
+      const post = req.body;
+      const result = await postsCollection.insertOne(post);
+      res.send(result);
+    });
+
+    app.get("/posts", async (req, res) => {
+      const query = {};
+      const result = await postsCollection
+        .find(query)
+        .sort({ $natural: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+    // delete react
+
+    app.delete("/delete/:id", async (req, res) => {
+      const react = req.body;
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const post = await postsCollection.findOne(filter);
+      const allReact = post?.reacts;
+
+      const existReactUser = allReact?.find(
+        (prevReact) => prevReact.userId === react.userId
+      );
+
+      if (existReactUser) {
+        const result = await postsCollection.updateOne(
+          filter,
+          {
+            $pull: { reacts: { userId: react.userId } },
+          },
+          { upsert: false }
+        );
+        return res.send(result);
+      }
+    });
+
+    // add react
+
+    app.put("/react/:id", async (req, res) => {
+      const react = req.body;
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+
+      const post = await postsCollection.findOne(filter);
+      const allReact = post?.reacts;
+
+      const existReactUser = allReact?.find(
+        (singlereact) => singlereact.userId === react.userId
+      );
+
+      if (existReactUser) {
+        const updateReact = await postsCollection.updateOne(
+          { _id: ObjectId(id), "reacts.userId": react.userId },
+          {
+            $set: {
+              "reacts.$.reactName": react.reactName,
+              "reacts.$.reactImg": react.reactImg,
+            },
+          }
+        );
+        return res.send(updateReact);
+      }
+
+      const options = { upsert: true };
+      const result = await postsCollection.updateOne(
+        filter,
+        {
+          $push: {
+            reacts: react,
+          },
+        },
+        options
+      );
+      res.send(result);
+    });
+
+    // add comment
+
+    app.put("/comment/:id", async (req, res) => {
+      const commemt = req.body;
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const options = { upsert: true };
+      const result = await postsCollection.updateOne(
+        filter,
+        {
+          $push: {
+            comments: commemt,
+          },
+        },
+        options
+      );
+      res.send(result);
+    });
 
     // <<.......... Save user & generate JWT.............>>
+
+    app.get("/users", async (req, res) => {
+      const query = {};
+      const result = await usersCollection.find(query).toArray();
+      res.send(result);
+    });
 
     app.put("/user/:email", async (req, res) => {
       const email = req.params.email;
