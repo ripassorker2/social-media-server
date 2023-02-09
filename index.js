@@ -25,6 +25,9 @@ async function run() {
   try {
     const usersCollection = client.db("social-media").collection("users");
     const postsCollection = client.db("social-media").collection("posts");
+    const profileInfoCollection = client
+      .db("social-media")
+      .collection("profileInfo");
 
     // <<.......... post post.............>>
     app.post("/post", async (req, res) => {
@@ -32,7 +35,24 @@ async function run() {
       const result = await postsCollection.insertOne(post);
       res.send(result);
     });
+    // <<.......... update post.............>>
+    app.put("/update/:id", async (req, res) => {
+      const id = req.params.id;
+      const body = req.body;
+      const postText = body.postText;
 
+      const filter = { _id: ObjectId(id) };
+      const options = { upsert: true };
+      const updateDoc = { $set: { postText } };
+      const result = await postsCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      res.send(result);
+    });
+
+    // <<.......... get post.............>>
     app.get("/posts", async (req, res) => {
       const query = {};
       const result = await postsCollection
@@ -41,9 +61,25 @@ async function run() {
         .toArray();
       res.send(result);
     });
+    // <<.......... get post.............>>
+    app.get("/posts/:email", async (req, res) => {
+      const email = req.params.email;
+      const filter = { posterEmail: email };
+      const result = await postsCollection
+        .find(filter)
+        .sort({ $natural: -1 })
+        .toArray();
+      res.send(result);
+    });
+    // <<.......... post delete.............>>
+    app.delete("/post/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const result = await postsCollection.deleteOne(filter);
+      res.send(result);
+    });
 
-    // delete react
-
+    // <<.......... delete react.............>>
     app.delete("/delete/:id", async (req, res) => {
       const react = req.body;
       const id = req.params.id;
@@ -67,7 +103,7 @@ async function run() {
       }
     });
 
-    // add react
+    // <<.......... add or update react.............>>
 
     app.put("/react/:id", async (req, res) => {
       const react = req.body;
@@ -107,7 +143,7 @@ async function run() {
       res.send(result);
     });
 
-    // add comment
+    // <<.......... add comment.............>>
 
     app.put("/comment/:id", async (req, res) => {
       const commemt = req.body;
@@ -134,18 +170,27 @@ async function run() {
       res.send(result);
     });
 
+    // <<.......... get user by email.............>>
+
+    app.get("/user/:email", async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email };
+      const result = await usersCollection.findOne(filter);
+      res.send(result);
+    });
+
     app.put("/user/:email", async (req, res) => {
       const email = req.params.email;
-      const user = req.body;
+      const body = req.body;
       const filter = { email: email };
       const options = { upsert: true };
-      const updateDoc = { $set: user };
+      const updateDoc = { $set: body };
       const result = await usersCollection.updateOne(
         filter,
         updateDoc,
         options
       );
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+      const token = jwt.sign(body, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "7d",
       });
       res.send({ result, token });
