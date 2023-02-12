@@ -25,17 +25,282 @@ async function run() {
   try {
     const usersCollection = client.db("social-media").collection("users");
     const postsCollection = client.db("social-media").collection("posts");
-    const profileInfoCollection = client
-      .db("social-media")
-      .collection("profileInfo");
+
+    // <<.......... add Friend.............>>
+
+    app.put("/addFriend/:id", async (req, res) => {
+      const body = req.body;
+      const senderFilter = { _id: ObjectId(req.body.id) };
+      const receiverFilter = { _id: ObjectId(req.params.id) };
+
+      if (req.params.id !== body.id) {
+        const sender = await usersCollection.findOne(senderFilter);
+
+        const receiver = await usersCollection.findOne(receiverFilter);
+
+        const exisReceiver = receiver?.followers?.find(
+          (r) => r.email === body.email
+        );
+        const options = { upsert: true };
+
+        if (!exisReceiver) {
+          const result1 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $push: {
+                requests: {
+                  id: receiver._id,
+                  name: receiver.name,
+                  email: receiver.email,
+                  profileImg: receiver?.profileImg,
+                  currentDate: body.currentDate,
+                  currentTime: body.currentTime,
+                },
+              },
+            },
+            options
+          );
+          const result2 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $push: {
+                following: {
+                  id: receiver._id,
+                  name: receiver.name,
+                  email: receiver.email,
+                  profileImg: receiver?.profileImg,
+                  currentDate: body.currentDate,
+                  currentTime: body.currentTime,
+                },
+              },
+            },
+            options
+          );
+          const result3 = await usersCollection.updateOne(
+            receiverFilter,
+            {
+              $push: {
+                followers: {
+                  id: sender._id,
+                  name: sender.name,
+                  email: sender.email,
+                  profileImg: sender?.profileImg,
+                  currentDate: body.currentDate,
+                  currentTime: body.currentTime,
+                },
+              },
+            },
+            options
+          );
+          return res.send(result1, result2, result3);
+        } else {
+          return res.send("All ready sent request");
+        }
+      } else {
+        return res.send("You cannot send request yourself....");
+      }
+    });
+    // <<.......... accept  friend request .............>>
+
+    app.put("/accept/:id", async (req, res) => {
+      const body = req.body;
+
+      const senderFilter = { _id: ObjectId(req.params.id) };
+      const receiverFilter = { _id: ObjectId(req.body.id) };
+
+      if (req.params.id !== body.id) {
+        const sender = await usersCollection.findOne(senderFilter);
+        const receiver = await usersCollection.findOne(receiverFilter);
+
+        const existReceiver = receiver?.followers?.find(
+          (r) => r.email === sender.email
+        );
+        const options = { upsert: true };
+
+        if (existReceiver) {
+          const result1 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $push: {
+                friends: {
+                  id: receiver._id,
+                  name: receiver.name,
+                  email: receiver.email,
+                  profileImg: receiver?.profileImg,
+                },
+              },
+            },
+            options
+          );
+          const result2 = await usersCollection.updateOne(
+            receiverFilter,
+            {
+              $push: {
+                friends: {
+                  id: sender._id,
+                  name: sender.name,
+                  email: sender.email,
+                  profileImg: sender?.profileImg,
+                },
+              },
+            },
+            options
+          );
+          const result3 = await usersCollection.updateOne(
+            receiverFilter,
+            {
+              $pull: {
+                followers: { email: sender.email },
+              },
+            },
+            { upsert: false }
+          );
+          const result4 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $pull: {
+                requests: { email: body.email },
+              },
+            },
+            { upsert: false }
+          );
+          const result5 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $pull: {
+                following: { email: body.email },
+              },
+            },
+            { upsert: false }
+          );
+          return res.send(result1, result2, result3, result4, result5);
+        } else {
+          return res.send("user not exixt");
+        }
+      } else {
+        return res.send("You cannot send request yourself....");
+      }
+    });
+    // // <<.......... delete  request friend request .............>>
+
+    app.put("/delete/:id", async (req, res) => {
+      const body = req.body;
+
+      const senderFilter = { _id: ObjectId(req.params.id) };
+      const receiverFilter = { _id: ObjectId(req.body.id) };
+
+      if (req.params.id !== body.id) {
+        const sender = await usersCollection.findOne(senderFilter);
+        const receiver = await usersCollection.findOne(receiverFilter);
+
+        const existReceiver = receiver?.followers?.find(
+          (r) => r.email === sender.email
+        );
+
+        const options = { upsert: false };
+
+        if (existReceiver) {
+          const result1 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $pull: {
+                requests: { email: body.email },
+              },
+            },
+            options
+          );
+          const result2 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $pull: {
+                following: { email: body.email },
+              },
+            },
+            options
+          );
+          const result3 = await usersCollection.updateOne(
+            receiverFilter,
+            {
+              $pull: {
+                followers: { email: sender.email },
+              },
+            },
+            options
+          );
+
+          return res.send(result1, result2, result3);
+        } else {
+          return res.send("user not exixt");
+        }
+      } else {
+        return res.send("You cannot send request yourself....");
+      }
+    });
+    // // <<.......... cancle request friend request .............>>
+
+    app.put("/cancle/:id", async (req, res) => {
+      const body = req.body;
+      const senderFilter = { _id: ObjectId(req.body.id) };
+      const receiverFilter = { _id: ObjectId(req.params.id) };
+
+      if (req.params.id !== body.id) {
+        const sender = await usersCollection.findOne(senderFilter);
+        const receiver = await usersCollection.findOne(receiverFilter);
+
+        const exisReceiver = receiver?.followers?.find(
+          (r) => r.email === body.email
+        );
+
+        const options = { upsert: false };
+
+        if (exisReceiver) {
+          const result1 = await usersCollection.updateOne(
+            receiverFilter,
+            {
+              $pull: {
+                followers: { email: body.email },
+              },
+            },
+            options
+          );
+          const result2 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $pull: {
+                requests: { email: receiver.email },
+              },
+            },
+            options
+          );
+          const result3 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $pull: {
+                following: { email: receiver.email },
+              },
+            },
+            options
+          );
+
+          return res.send(result1, result2, result3);
+        } else {
+          return res.send("user not exixt");
+        }
+      } else {
+        return res.send("You cannot send request yourself....");
+      }
+    });
 
     // <<.......... post post.............>>
+
     app.post("/post", async (req, res) => {
       const post = req.body;
       const result = await postsCollection.insertOne(post);
       res.send(result);
     });
+
     // <<.......... update post.............>>
+
     app.put("/update/:id", async (req, res) => {
       const id = req.params.id;
       const body = req.body;
@@ -61,7 +326,9 @@ async function run() {
         .toArray();
       res.send(result);
     });
+
     // <<.......... get post.............>>
+
     app.get("/posts/:email", async (req, res) => {
       const email = req.params.email;
       const filter = { posterEmail: email };
@@ -71,7 +338,9 @@ async function run() {
         .toArray();
       res.send(result);
     });
+
     // <<.......... post delete.............>>
+
     app.delete("/post/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
@@ -80,6 +349,7 @@ async function run() {
     });
 
     // <<.......... delete react.............>>
+
     app.delete("/delete/:id", async (req, res) => {
       const react = req.body;
       const id = req.params.id;
@@ -162,7 +432,7 @@ async function run() {
       res.send(result);
     });
 
-    // <<.......... Save user & generate JWT.............>>
+    // <<.......... get all user.............>>
 
     app.get("/users", async (req, res) => {
       const query = {};
@@ -178,6 +448,8 @@ async function run() {
       const result = await usersCollection.findOne(filter);
       res.send(result);
     });
+
+    // <<.......... post and update user and user info.............>>
 
     app.put("/user/:email", async (req, res) => {
       const email = req.params.email;
