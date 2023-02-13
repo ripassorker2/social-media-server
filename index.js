@@ -236,6 +236,53 @@ async function run() {
         return res.send("You cannot send request yourself....");
       }
     });
+    // // <<.......... delete  friend request .............>>
+
+    app.put("/deleteFrn/:id", async (req, res) => {
+      const body = req.body;
+
+      const senderFilter = { _id: ObjectId(req.params.id) };
+      const receiverFilter = { _id: ObjectId(req.body.id) };
+
+      if (req.params.id !== body.id) {
+        const sender = await usersCollection.findOne(senderFilter);
+        const receiver = await usersCollection.findOne(receiverFilter);
+
+        const existReceiver = receiver?.friends?.find(
+          (r) => r.email === sender.email
+        );
+
+        const options = { upsert: false };
+
+        if (existReceiver) {
+          const result1 = await usersCollection.updateOne(
+            senderFilter,
+            {
+              $pull: {
+                friends: { email: body.email },
+              },
+            },
+            options
+          );
+
+          const result2 = await usersCollection.updateOne(
+            receiverFilter,
+            {
+              $pull: {
+                friends: { email: sender.email },
+              },
+            },
+            options
+          );
+
+          return res.send({ result1, result2 });
+        } else {
+          return res.send("user not exixt");
+        }
+      } else {
+        return res.send("You cannot send request yourself....");
+      }
+    });
     // // <<.......... cancle request friend request .............>>
 
     app.put("/cancle/:id", async (req, res) => {
