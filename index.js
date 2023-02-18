@@ -26,9 +26,40 @@ async function run() {
     const usersCollection = client.db("social-media").collection("users");
     const postsCollection = client.db("social-media").collection("posts");
 
+    //.............verify JWT........................
+
+    function verifyJWT(req, res, next) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res
+          .status(401)
+          .send({ message: "Unauthorization access .. kono access nai... !!" });
+      }
+      const token = authHeader.split(" ")[1];
+      jwt.verify(
+        token,
+        process.env.ACCESS_TOKEN_SECRET,
+        function (err, decoded) {
+          if (err) {
+            return res.status(402).send({
+              success: false,
+              message: "Forbidden access",
+            });
+          }
+          req.decoded = decoded;
+          next();
+        }
+      );
+    }
+
     // <<.......... add Friend.............>>
 
-    app.put("/addFriend/:id", async (req, res) => {
+    app.put("/addFriend/:id", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      if (decodedEmail !== req.body.email) {
+        return res.status(403).send({ message: "Unmatched email" });
+      }
+
       const body = req.body;
       const senderFilter = { _id: ObjectId(req.body.id) };
       const receiverFilter = { _id: ObjectId(req.params.id) };
@@ -37,6 +68,9 @@ async function run() {
         const sender = await usersCollection.findOne(senderFilter);
 
         const receiver = await usersCollection.findOne(receiverFilter);
+
+        console.log(receiver);
+        console.log(sender);
 
         const exisReceiver = receiver?.followers?.find(
           (r) => r.email === body.email
@@ -102,7 +136,12 @@ async function run() {
     });
     // <<.......... accept  friend request .............>>
 
-    app.put("/accept/:id", async (req, res) => {
+    app.put("/accept/:id", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      if (decodedEmail !== req.body.email) {
+        return res.status(403).send({ message: "Unmatched email" });
+      }
+
       const body = req.body;
 
       const senderFilter = { _id: ObjectId(req.params.id) };
@@ -111,6 +150,10 @@ async function run() {
       if (req.params.id !== body.id) {
         const sender = await usersCollection.findOne(senderFilter);
         const receiver = await usersCollection.findOne(receiverFilter);
+        receiver;
+
+        console.log(sender);
+        console.log();
 
         const existReceiver = receiver?.followers?.find(
           (r) => r.email === sender.email
@@ -183,7 +226,12 @@ async function run() {
     });
     // // <<.......... delete  request friend request .............>>
 
-    app.put("/delete/:id", async (req, res) => {
+    app.put("/delete/:id", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      if (decodedEmail !== req.body.email) {
+        return res.status(403).send({ message: "Unmatched email" });
+      }
+
       const body = req.body;
 
       const senderFilter = { _id: ObjectId(req.params.id) };
@@ -238,7 +286,12 @@ async function run() {
     });
     // // <<.......... delete  friend request .............>>
 
-    app.put("/deleteFrn/:id", async (req, res) => {
+    app.put("/deleteFrn/:id", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      if (decodedEmail !== req.body.email) {
+        return res.status(403).send({ message: "Unmatched email" });
+      }
+
       const body = req.body;
 
       const senderFilter = { _id: ObjectId(req.params.id) };
@@ -285,7 +338,12 @@ async function run() {
     });
     // // <<.......... cancle request friend request .............>>
 
-    app.put("/cancle/:id", async (req, res) => {
+    app.put("/cancle/:id", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      if (decodedEmail !== req.body.email) {
+        return res.status(403).send({ message: "Unmatched email" });
+      }
+
       const body = req.body;
       const senderFilter = { _id: ObjectId(req.body.id) };
       const receiverFilter = { _id: ObjectId(req.params.id) };
@@ -376,7 +434,7 @@ async function run() {
 
     // <<.......... get post.............>>
 
-    app.get("/posts/:email", async (req, res) => {
+    app.get("/posts/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const filter = { posterEmail: email };
       const result = await postsCollection
